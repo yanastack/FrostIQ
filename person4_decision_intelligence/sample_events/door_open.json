@@ -1,0 +1,7 @@
+{
+  "predicted_event": "door_left_open",
+  "temperature_c": 9.0,
+  "warming_rate_c_per_min": 0.08,
+  "excursion_minutes": 20,
+  "risk_level": "warning"
+}
