@@ -1,0 +1,75 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FrostIQ · Room monitor</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6f2;color:#17352e;font:16px/1.48 "Inter",system-ui,sans-serif}
+header{background:#123e35;color:#fff;padding:16px max(5vw,24px);display:flex;justify-content:space-between;align-items:center}
+header b{font-size:24px}header span{font:14px monospace}main{max-width:1180px;margin:auto;padding:25px}
+h1{font-size:clamp(30px,4vw,48px);letter-spacing:-.045em;margin:0}h2{font-size:21px;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(230px,.8fr);gap:18px}.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+article,section,form{background:white;border:1px solid #d6e1d9;border-radius:12px;padding:18px;margin-bottom:12px}
+article{margin:0 0 6px}strong{font-size:24px;display:block}small,.stamp{color:#4a625a}p{margin:8px 0}
+aside{padding-top:12px}label{display:block;margin:10px 0;font-size:14px}input,select,button{font:inherit;width:100%;padding:8px;border:1px solid #a4b9aa;border-radius:6px;color:inherit}
+button{background:#156049;color:white;cursor:pointer;margin-top:6px}.row{display:flex;gap:8px}.row button{flex:1}button.stop{background:#a8322d}button:disabled{opacity:.35;cursor:not-allowed}.rec{padding:12px;border-radius:8px;font-weight:700;margin:6px 0 4px;font-size:15px}.rec.idle{background:#e7ece8;color:#4a625a}.rec.on{background:#fde4e1;color:#a8322d}.rec.ok{background:#dcf1e3;color:#115c3b}.rec.bad{background:#fff0d1;color:#8a5a00}@keyframes pulse{50%{opacity:.45}}.rec.on .dot{animation:pulse 1s infinite}svg{width:100%;height:auto}svg text{font:13px monospace;fill:#496359}
+table{width:100%;text-align:left;border-collapse:collapse;font-size:14px}td,th{padding:7px;border-bottom:1px solid #dde5de}.scroll{overflow-x:auto}
+@media(max-width:760px){.grid{grid-template-columns:1fr}main{padding:15px}.tiles{gap:6px}}
+</style>
+<header><b>FrostIQ</b><span>{{source}} feed</span></header>
+<main data-room="{{room}}"><h1>Room monitor</h1><span>{{room}}</span>
+<div class="grid"><div id="panel">Connecting…</div><aside>
+<form id="assumptions"><h2>View &amp; assumptions</h2>
+<label>History window<select name="minutes"><option value="5">5 minutes</option><option selected value="20">20 minutes</option><option value="60">1 hour</option></select></label>
+<label>Target temperature (°C, operator assumption)<input name="target" type="number" step=".1" min="-80" max="100" value="5" required></label>
+<button>Apply</button></form>
+<form id="load"><h2>Record a load</h2><label>Load ID<input name="load_id" required></label><label>Item<input name="item" required></label>
+<label>Scheduled (UTC)<input type="datetime-local" name="scheduled_at"></label><label>Actual arrival (UTC)<input type="datetime-local" name="actual_at"></label>
+<button>Save load</button><output></output></form>
+<form id="recording" {{real_hidden}} onsubmit="return false"><h2>Training recording</h2>
+<div id="recstatus" class="rec idle">NOT RECORDING</div>
+<label>What are you recording?<select name="label"><option value="door_left_open">Door left open</option><option value="normal">Normal (door closed, steady)</option><option value="possible_cooling_failure">Unexplained warming (door closed)</option><option value="loading_warming">Loading-related warming</option></select></label>
+<div class="row"><button type="button" id="recstart">Start</button><button type="button" id="recstop" class="stop">Stop</button></div>
+<small id="rechint">Hold the door still and closed until calibration finishes, then press Start.</small></form>
+<form id="recalibrate" {{real_hidden}}><h2>Door calibration</h2><button>Re-calibrate (door must be closed)</button><output></output></form>
+<form id="scenario" {{simulation_hidden}}><h2>Simulated event</h2><label>Scenario<select name="scenario"><option value="normal">Normal</option><option value="door_left_open">Door left open</option><option value="loading_warming">Loading-related warming</option><option value="possible_cooling_failure">Unexplained warming</option></select></label><button>Run scenario</button><output></output></form>
+</aside></div></main>
+<script>
+const panel = document.querySelector('#panel'), assumptions = document.querySelector('#assumptions');
+let params = new URLSearchParams(new FormData(assumptions)), busy = false;
+async function refresh(){
+ if (busy) return; busy=true;
+ try {const r=await fetch('/panel?'+params);if(!r.ok) throw Error();panel.innerHTML=await r.text();}
+ catch {panel.textContent='Connection interrupted. Waiting for the board…';} finally {busy=false;}
+}
+assumptions.onsubmit=e=>{e.preventDefault();params=new URLSearchParams(new FormData(assumptions));refresh();};
+const routes={load:'/api/loads',scenario:'/api/scenario',recalibrate:'/api/recalibrate'};
+const done={load:'Load saved.',scenario:'Scenario running.',recalibrate:'Calibration restarted. Keep the door closed.'};
+for(const id of Object.keys(routes)){
+ const form=document.getElementById(id);
+ form.onsubmit=async e=>{
+  e.preventDefault();const payload=Object.fromEntries(new FormData(form));
+  if(id==='load'){
+   payload.room_id=document.querySelector('main').dataset.room;
+   for(const key of ['scheduled_at','actual_at']){if(payload[key])payload[key]+=':00Z';else delete payload[key];}
+  }
+  try{const r=await fetch(routes[id],{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+   const result=await r.json();if(!r.ok)throw Error(result.error);
+   form.querySelector('output').textContent=done[id];refresh();
+  }catch(err){form.querySelector('output').textContent=err.message;}
+ };
+}
+
+const recBox=document.getElementById('recstatus'),recStart=document.getElementById('recstart'),recStop=document.getElementById('recstop'),recHint=document.getElementById('rechint'),recLabel=document.querySelector('#recording select');
+const mmss=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0');
+async function recCall(path,body){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});const j=await r.json();if(!r.ok)throw Error(j.error);return j;}
+async function recRefresh(){
+ try{const s=await (await fetch('/api/recording')).json();
+  const on=s.state==='recording';recStart.disabled=on||!s.calibrated;recStop.disabled=!on;recLabel.disabled=on;
+  if(on){recBox.className='rec on';recBox.innerHTML='<span class="dot">●</span> RECORDING · '+s.label.replace(/_/g,' ')+' · '+mmss(s.elapsed_s)+'<br><small>'+s.samples+' readings, '+s.usable+' usable (need '+s.need+'+)</small>';recHint.textContent='Perform the scenario now. Press Stop when finished.';}
+  else if(s.state==='stopped'&&s.last){recBox.className='rec '+(s.last.saved?'ok':'bad');recBox.innerHTML=(s.last.saved?'■ STOPPED · SAVED':'■ STOPPED · NOT SAVED')+'<br><small>'+s.last.message+'</small>';recHint.textContent='Reset the door and let the temperature settle before the next recording.';}
+  else{recBox.className='rec idle';recBox.textContent='NOT RECORDING';recHint.textContent=s.calibrated?'Choose what you are recording, then press Start.':'Waiting for door calibration: keep the door closed and still.';}
+ }catch{recBox.className='rec bad';recBox.textContent='Cannot reach the board';}
+}
+recStart.onclick=async()=>{try{await recCall('/api/recording',{label:recLabel.value});}catch(e){recHint.textContent=e.message;}recRefresh();};
+recStop.onclick=async()=>{try{await recCall('/api/recording/stop',{});}catch(e){recHint.textContent=e.message;}recRefresh();};
+setInterval(recRefresh,1000);recRefresh();
+refresh();setInterval(refresh,2000);
+</script></html>

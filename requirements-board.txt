@@ -1,0 +1,3 @@
+# Install on the UNO Q before going offline. Training uses this package.
+# The backend and exported model runtime use only Python's standard library.
+scikit-learn>=1.4,<2

@@ -1,0 +1,92 @@
+ARCHIVE NOTE (public release): These instructions describe an earlier development state. See README.md, START_HERE.md, DEPLOY_ON_UNO_Q.md, and CHANGES.md for current context. A previously trained model and private recordings are intentionally not included here.
+
+FrostIQ AI preparation - ready for later board work
+=================================================
+
+WHAT IS ALREADY WORKING
+You have run the laptop simulator, seen readings in a browser and switched
+the door-open scenario. The backend still reports not_trained by default.
+
+WHAT THE NEW FILES DO
+features.py: chooses consistent sensor inputs and an optional-motion availability
+flag for training and predictions. A missing motion sensor is kept distinct
+from a motion sensor reporting no movement.
+train_on_uno_q.py: learns a small decision tree, evaluates it and exports JSON.
+model_runtime.py: loads that JSON and explains the tree's actual decision path.
+requirements-board.txt: the training package to install on the board.
+
+These files are code prepared for your next stage. No trained model or real
+accuracy result has been created on the laptop. Writing code is separate
+from training it. The training command refuses to run on Windows.
+
+STEPS THAT NEED THE UNO Q AND PERSON 1
+1. Connect the real sensors to the backend through a board-side Bridge adapter.
+   The adapter still needs to be written against Person 1's actual sketch.
+2. Calibrate how the distance reading maps to door position. These model inputs
+   require a usable door state. Real mode defaults to unknown until configured.
+3. Record repeated, labeled trials for all four events. Restart the real backend
+   for each trial to create a new recording_id and fresh feature history. Keep
+   each recording to one known event, and record its true label manually.
+4. Create a labels.json file that maps each recording_id to its true event:
+
+   {
+     "recording-id-copied-from-your-first-trial": "normal",
+     "recording-id-copied-from-your-next-trial": "door_left_open"
+   }
+
+   This is a format example, not a complete training dataset. The other events
+   are loading_warming and possible_cooling_failure. The code requires at least
+   three separate trials per event and 20 usable readings per trial. Those are
+   starter minimums, not evidence that the dataset is sufficient for deployment.
+   Each trial needs a warm-up window before a temperature trend is available.
+
+5. While the board has internet access, create a Python environment ON THE BOARD:
+
+   python3 -m venv .venv
+   .venv/bin/python -m pip install -r requirements-board.txt
+
+   If the board does not have Python's venv support, install that prerequisite
+   during board setup. Dependency installation is separate from model training.
+
+6. Stop recording so the dataset is complete. Run training ONLY FROM A TERMINAL
+   ON THE UNO Q, using the board's data paths:
+
+   .venv/bin/python train_on_uno_q.py --data data/real-readings.jsonl --labels data/labels.json --output models/event_tree.json --confirm-uno-q
+
+   The confirmation flag means you personally checked that the terminal is on
+   the board. The code checks Linux and that flag; it cannot prove the hardware
+   identity independently. The trainer ignores all simulated log entries.
+
+7. Start the backend on the board using the exported model:
+
+   python3 backend.py --source real --model models/event_tree.json
+
+   Keep the door closed during the first 15 valid distance samples for adaptive calibration.
+
+8. Test new, separate physical trials with the full team, then repeat offline.
+   Confirm the dashboard distinguishes live predictions from scripted scenarios.
+
+MODEL RESULTS
+No model loaded: status=not_trained, event=null.
+Missing inputs or trend warming up: status=insufficient_data, event=null.
+Missing motion is supported when the training data includes that availability
+state. A model trained with motion present abstains if motion later disappears.
+Top leaf class fraction below 0.7: status=uncertain, event=null.
+Otherwise: status=predicted, event=one of the four labels.
+score is the class fraction at the selected tree leaf, not a calibrated measure
+of real-world reliability. New or ambiguous situations can still be misclassified.
+evidence contains feature, value, comparison and threshold for each actual
+model check taken along the decision path. It does not establish physical cause.
+
+The saved model includes dataset hashes, recording IDs and a held-out evaluation
+report. Complete trials are held out, so neighboring/overlapping readings from
+the same trial never appear on both sides of that split. The exact evaluated
+model is exported; the test trials are not used to fit it afterward.
+validation_report describes the underlying classifier. runtime_validation also
+counts abstentions from the actual serving policy, including unavailable motion
+states and low scores, so the operational behavior can be assessed separately.
+
+SOURCE REFERENCES
+https://scikit-learn.org/stable/modules/generated/sklearn.tree.DecisionTreeClassifier.html
+https://scikit-learn.org/stable/auto_examples/tree/plot_unveil_tree_structure.html
+https://scikit-learn.org/stable/modules/generated/sklearn.metrics.classification_report.html

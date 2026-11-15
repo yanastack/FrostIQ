@@ -2,6 +2,7 @@
 
 Usage on the board:
   python3 run_on_uno_q.py sample_events/door_open.json
+  python3 run_on_uno_q.py sample_events/unexplained_warming.json
 """
 import json
 import sys

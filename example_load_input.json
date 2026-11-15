@@ -1,0 +1,8 @@
+{
+  "room_id": "demo_room",
+  "load_id": "L-104",
+  "item": "yogurt",
+  "scheduled_at": "2026-11-14T20:00:00Z",
+  "actual_at": "2026-11-14T20:20:00Z",
+  "product_arrival_temperature_c": null
+}

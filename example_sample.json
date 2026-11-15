@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.1",
+  "room_id": "demo_room",
+  "door_id": "door_1",
+  "session_id": "00000000-0000-4000-8000-000000000002",
+  "timestamp": "2026-11-14T12:00:00Z",
+  "source": "simulated",
+  "recording_id": "00000000-0000-4000-8000-000000000001",
+  "readings": {
+    "temperature_c": 4.03,
+    "distance_cm": 5.02,
+    "motion_detected": false
+  },
+  "sensor_status": {
+    "temperature_c": "ok",
+    "distance_cm": "ok",
+    "motion_detected": "ok"
+  },
+  "derived": {
+    "temperature_rate_c_per_min": null,
+    "door_open": false,
+    "door_open_duration_s": 0.0
+  },
+  "prediction": {
+    "status": "not_trained",
+    "event": null,
+    "score": null,
+    "evidence": []
+  },
+  "simulation": {
+    "scenario": "normal",
+    "training_label": "normal",
+    "elapsed_s": 1.0
+  },
+  "loading_context": {
+    "last_actual_load": null,
+    "seconds_since_last_actual_load": null
+  }
+}

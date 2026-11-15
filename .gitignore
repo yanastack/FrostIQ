@@ -1,16 +1,32 @@
-__pycache__/
-*.py[cod]
-.venv/
-venv/
+# Private sensor recordings, labels, databases, and model artifacts
+/data/
+/models/
+*.log
+*.log.*
+*.sqlite
+*.sqlite3*
+*.db
+*.db-*
+
+# Credentials, machine-local configs, personal information
 .env
 .env.*
 !.env.example
-.DS_Store
-.vscode/
-.idea/
 *.pem
 *.key
 *.p12
-*.log
-*.sqlite3
-*.db
+*.pfx
+credentials.json
+secrets.json
+private/
+
+# Python and editor artifacts
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.DS_Store
+.idea/
+.vscode/

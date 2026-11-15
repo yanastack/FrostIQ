@@ -120,7 +120,8 @@ def _normalize_settings(settings):
             raise ValueError("Unknown settings: " + ", ".join(sorted(unknown)))
         merged.update(settings)
     return {
-        key: _finite_number(value, key, minimum=0.0)
+        # FrostIQ integration fix: a freezer target below 0 C is valid.
+        key: _finite_number(value, key, minimum=None if key == "temperature_limit_c" else 0.0)
         for key, value in merged.items()
     }
 
